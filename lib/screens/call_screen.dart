@@ -77,6 +77,7 @@ class _CallScreenState extends State<CallScreen> {
             child: Wrap(
               spacing: 8.0,
               children: _signalingService.clients
+                  .where((clientId) => clientId != _signalingService.selfId)
                   .map((clientId) => ElevatedButton(
                         onPressed: () async {
                           await _webRTCService.initiatePeerConnection((candidate) {

@@ -29,7 +29,6 @@ class SignalingService extends ChangeNotifier {
 
     _socket!.on('clients', (data) {
       _clients = List<String>.from(data);
-      _clients.remove(_selfId);
       notifyListeners();
     });
 

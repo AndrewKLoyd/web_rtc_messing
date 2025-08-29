@@ -14,7 +14,15 @@ app.get('/clients', (req, res) => {
 
 io.on('connection', (socket) => {
   console.log('a user connected:', socket.id);
+
+  // Emit the current list of clients to the new user
+  socket.emit('clients', clients.map(client => client.id));
+
+  // Add the new client to the list
   clients.push(socket);
+
+  // Broadcast the updated list to all clients
+  io.emit('clients', clients.map(client => client.id));
 
   socket.on('disconnect', () => {
     console.log('user disconnected:', socket.id);
@@ -24,32 +32,33 @@ io.on('connection', (socket) => {
 
   socket.on('register', (id) => {
     console.log(`Registering client with id: ${id}`);
-    socket.id = id;
+    const clientIndex = clients.findIndex(client => client.id === socket.id);
+    if (clientIndex !== -1) {
+      clients[clientIndex].id = id;
+    }
     io.emit('clients', clients.map(client => client.id));
   });
 
   socket.on('offer', (data) => {
     const targetSocket = clients.find(client => client.id === data.target);
     if (targetSocket) {
-      targetSocket.emit('offer', { from: socket.id, offer: data.offer });
+      targetSocket.emit('offer', { from: data.from || socket.id, offer: data.offer });
     }
   });
 
   socket.on('answer', (data) => {
     const targetSocket = clients.find(client => client.id === data.target);
     if (targetSocket) {
-      targetSocket.emit('answer', { from: socket.id, answer: data.answer });
+      targetSocket.emit('answer', { from: data.from || socket.id, answer: data.answer });
     }
   });
 
   socket.on('candidate', (data) => {
     const targetSocket = clients.find(client => client.id === data.target);
     if (targetSocket) {
-      targetSocket.emit('candidate', { from: socket.id, candidate: data.candidate });
+      targetSocket.emit('candidate', { from: data.from || socket.id, candidate: data.candidate });
     }
   });
-
-  io.emit('clients', clients.map(client => client.id));
 });
 
 const port = process.env.PORT || 3000;
