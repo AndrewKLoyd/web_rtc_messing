@@ -63,6 +63,6 @@ io.on('connection', (socket) => {
 
 const port = process.env.PORT || 3000;
 
-server.listen(port, () => {
+server.listen(port, "192.168.1.146", () => {
   console.log(`Signaling server listening on port ${port}`);
 });

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:provider/provider.dart';
@@ -25,11 +24,14 @@ class _CallScreenState extends State<CallScreen> {
     _webRTCService.initialize();
 
     _signalingService.onOffer = (from, offer) async {
-      await _webRTCService.initiatePeerConnection((candidate) {
-        _signalingService.sendCandidate(from, candidate);
-      }, (stream) {
-        setState(() {});
-      });
+      await _webRTCService.initiatePeerConnection(
+        (candidate) {
+          _signalingService.sendCandidate(from, candidate);
+        },
+        (stream) {
+          setState(() {});
+        },
+      );
       await _webRTCService.setRemoteDescription(offer);
       final answer = await _webRTCService.createAnswer();
       _signalingService.sendAnswer(from, answer);
@@ -55,43 +57,51 @@ class _CallScreenState extends State<CallScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('WebRTC Call'),
-      ),
+      appBar: AppBar(title: Text('WebRTC Call')),
       body: Column(
         children: [
           Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: RTCVideoView(_webRTCService.localRenderer),
-                ),
-                Expanded(
-                  child: RTCVideoView(_webRTCService.remoteRenderer),
-                ),
-              ],
+            child: ListenableBuilder(
+              listenable: _webRTCService,
+              builder: (context, child) => Row(
+                children: [
+                  Expanded(child: RTCVideoView(_webRTCService.localRenderer)),
+                  Expanded(child: RTCVideoView(_webRTCService.remoteRenderer)),
+                ],
+              ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Wrap(
-              spacing: 8.0,
-              children: _signalingService.clients
-                  .where((clientId) => clientId != _signalingService.selfId)
-                  .map((clientId) => ElevatedButton(
+            child: ListenableBuilder(
+              listenable: _signalingService,
+              builder: (context, child) => Wrap(
+                spacing: 8.0,
+                children: _signalingService.clients
+                    .where((clientId) => clientId != _signalingService.selfId)
+                    .map(
+                      (clientId) => ElevatedButton(
                         onPressed: () async {
-                          await _webRTCService.initiatePeerConnection((candidate) {
-                            _signalingService.sendCandidate(clientId, candidate);
-                          }, (stream) {
-                            setState(() {});
-                          });
+                          await _webRTCService.initiatePeerConnection(
+                            (candidate) {
+                              _signalingService.sendCandidate(
+                                clientId,
+                                candidate,
+                              );
+                            },
+                            (stream) {
+                              setState(() {});
+                            },
+                          );
                           await _webRTCService.openUserMedia();
                           final offer = await _webRTCService.createOffer();
                           _signalingService.sendOffer(clientId, offer);
                         },
                         child: Text('Call $clientId'),
-                      ))
-                  .toList(),
+                      ),
+                    )
+                    .toList(),
+              ),
             ),
           ),
         ],

@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 
@@ -14,7 +13,7 @@ class SignalingService extends ChangeNotifier {
   List<String> get clients => _clients;
 
   void connect() {
-    _socket = IO.io('http://localhost:3000', <String, dynamic>{
+    _socket = IO.io('http://192.168.1.146:3000', <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
     });
