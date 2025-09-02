@@ -16,12 +16,6 @@ class WebRTCService extends ChangeNotifier {
   Future<void> initialize() async {
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
-  }
-
-  Future<void> initiatePeerConnection(
-    Function(dynamic) onIceCandidate,
-    Function(MediaStream) onAddStream,
-  ) async {
     final Map<String, dynamic> configuration = {
       'iceServers': [
         {'urls': 'stun:stun.l.google.com:19302'},
@@ -29,7 +23,12 @@ class WebRTCService extends ChangeNotifier {
     };
 
     _peerConnection = await createPeerConnection(configuration, {});
+  }
 
+  Future<void> initiatePeerConnection(
+    Function(dynamic) onIceCandidate,
+    Function(MediaStream) onAddStream,
+  ) async {
     _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
       onIceCandidate(candidate.toMap());
     };
@@ -38,7 +37,11 @@ class WebRTCService extends ChangeNotifier {
       if (state != RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
         return;
       }
-      openUserMedia();
+
+      _peerConnection?.addStream(_localStream!);
+      _localStream?.getTracks().forEach(
+        (element) => _peerConnection?.addTrack(element, _localStream!),
+      );
     };
 
     _peerConnection!.onTrack = (RTCTrackEvent event) {
@@ -88,12 +91,11 @@ class WebRTCService extends ChangeNotifier {
       'audio': true,
       'video': {'facingMode': 'user'},
     };
-
     _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
     _localRenderer.srcObject = _localStream;
-
+    if (_localStream == null) return;
     _localStream!.getTracks().forEach((track) {
-      _peerConnection!.addTrack(track, _localStream!);
+      _peerConnection?.addTrack(track, _localStream!);
     });
 
     notifyListeners();

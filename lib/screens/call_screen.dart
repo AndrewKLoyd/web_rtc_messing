@@ -35,7 +35,6 @@ class _CallScreenState extends State<CallScreen> {
       await _webRTCService.setRemoteDescription(offer);
       final answer = await _webRTCService.createAnswer();
       _signalingService.sendAnswer(from, answer);
-      await _webRTCService.openUserMedia();
     };
 
     _signalingService.onAnswer = (from, answer) async {
@@ -77,30 +76,36 @@ class _CallScreenState extends State<CallScreen> {
               listenable: _signalingService,
               builder: (context, child) => Wrap(
                 spacing: 8.0,
-                children: _signalingService.clients
-                    .where((clientId) => clientId != _signalingService.selfId)
-                    .map(
-                      (clientId) => ElevatedButton(
-                        onPressed: () async {
-                          await _webRTCService.initiatePeerConnection(
-                            (candidate) {
-                              _signalingService.sendCandidate(
-                                clientId,
-                                candidate,
-                              );
-                            },
-                            (stream) {
-                              setState(() {});
-                            },
-                          );
-                          await _webRTCService.openUserMedia();
-                          final offer = await _webRTCService.createOffer();
-                          _signalingService.sendOffer(clientId, offer);
-                        },
-                        child: Text('Call $clientId'),
-                      ),
-                    )
-                    .toList(),
+                children: [
+                  ElevatedButton(
+                    onPressed: () => _webRTCService.openUserMedia(),
+                    child: Text("Share video"),
+                  ),
+                  ..._signalingService.clients
+                      .where((clientId) => clientId != _signalingService.selfId)
+                      .map(
+                        (clientId) => ElevatedButton(
+                          onPressed: () async {
+                            await _webRTCService.initiatePeerConnection(
+                              (candidate) {
+                                _signalingService.sendCandidate(
+                                  clientId,
+                                  candidate,
+                                );
+                              },
+                              (stream) {
+                                setState(() {});
+                              },
+                            );
+
+                            final offer = await _webRTCService.createOffer();
+                            _signalingService.sendOffer(clientId, offer);
+                          },
+                          child: Text('Call $clientId'),
+                        ),
+                      )
+                      .toList(),
+                ],
               ),
             ),
           ),
