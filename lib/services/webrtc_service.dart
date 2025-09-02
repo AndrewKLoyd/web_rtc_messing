@@ -1,111 +1,124 @@
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:myapp/services/signaling_service.dart';
 
 class WebRTCService extends ChangeNotifier {
-  RTCPeerConnection? _peerConnection;
+  final SignalingService _signalingService;
+
+  late final RTCPeerConnection _connection;
+
+  final RTCVideoRenderer localRenderer = RTCVideoRenderer();
   MediaStream? _localStream;
-  MediaStream? _remoteStream;
-  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
-  final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
+  final RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
 
-  MediaStream? get localStream => _localStream;
-  MediaStream? get remoteStream => _remoteStream;
-  RTCVideoRenderer get localRenderer => _localRenderer;
-  RTCVideoRenderer get remoteRenderer => _remoteRenderer;
+  String target = "";
 
-  Future<void> initialize() async {
-    await _localRenderer.initialize();
-    await _remoteRenderer.initialize();
-    final Map<String, dynamic> configuration = {
-      'iceServers': [
-        {'urls': 'stun:stun.l.google.com:19302'},
-      ],
-    };
+  WebRTCService({required SignalingService signalingService})
+    : _signalingService = signalingService;
 
-    _peerConnection = await createPeerConnection(configuration, {});
+  Future<void> call(String target) async {
+    this.target = target;
+    await _createOffer();
   }
 
-  Future<void> initiatePeerConnection(
-    Function(dynamic) onIceCandidate,
-    Function(MediaStream) onAddStream,
-  ) async {
-    _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
-      onIceCandidate(candidate.toMap());
-    };
+  Future<void> init() async {
+    await localRenderer.initialize();
+    await remoteRenderer.initialize();
+    await getUserMedia();
+    _connection = await createPeerConnection({
+      'urls': 'stun:stun.l.google.com:19302',
+    }, {});
 
-    _peerConnection!.onConnectionState = (state) {
+    for (MediaStreamTrack track in _localStream?.getTracks() ?? []) {
+      _connection.addTrack(track, _localStream!);
+    }
+
+    _signalingService.onOffer = _onOffer;
+    _signalingService.onAnswer = _onAnswer;
+    _signalingService.onCandidate = _onICECandidate;
+
+    _connection.onConnectionState = (state) async {
+      print(state.name);
       if (state != RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
         return;
       }
 
-      _peerConnection?.addStream(_localStream!);
-      _localStream?.getTracks().forEach(
-        (element) => _peerConnection?.addTrack(element, _localStream!),
-      );
+      notifyListeners();
+    };
+    _connection.onIceCandidate = (candidate) {
+      _signalingService.sendCandidate(target, candidate.toMap());
+    };
+    _connection.onAddStream = (s) {
+      print(s);
+    };
+    _connection.onAddTrack = (s, t) {
+      print("s + t");
+    };
+    _connection.onAddTrack = (s, t) {
+      notifyListeners();
     };
 
-    _peerConnection!.onTrack = (RTCTrackEvent event) {
-      if (event.streams.isNotEmpty) {
-        _remoteRenderer.srcObject = event.streams[0];
-        onAddStream(_remoteStream!);
-        notifyListeners();
-      }
+    _connection.onAddStream = (stream) {
+      notifyListeners();
+    };
+    _connection.onTrack = (track) async {
+      await remoteRenderer.initialize();
+      remoteRenderer.srcObject = track.streams.first;
+      notifyListeners();
     };
   }
 
-  Future<Map<String, dynamic>> createOffer() async {
-    RTCSessionDescription description = await _peerConnection!.createOffer({
-      'offerToReceiveVideo': 1,
-    });
-    await _peerConnection!.setLocalDescription(description);
-    return description.toMap();
-  }
-
-  Future<Map<String, dynamic>> createAnswer() async {
-    RTCSessionDescription description = await _peerConnection!.createAnswer({
-      'offerToReceiveVideo': 1,
-    });
-    await _peerConnection!.setLocalDescription(description);
-    return description.toMap();
-  }
-
-  Future<void> setRemoteDescription(dynamic sdp) async {
-    RTCSessionDescription description = RTCSessionDescription(
-      sdp['sdp'],
-      sdp['type'],
+  Future<void> _onOffer(dynamic from, dynamic offer) async {
+    target = from;
+    await _connection.setRemoteDescription(
+      RTCSessionDescription(offer["sdp"], offer["type"]),
     );
-    await _peerConnection!.setRemoteDescription(description);
+    final answer = await _connection.createAnswer();
+    await _connection.setLocalDescription(answer);
+    // await _connection.setLocalDescription(answer);
+    _signalingService.sendAnswer(target, answer.toMap());
   }
 
-  Future<void> addCandidate(dynamic candidate) async {
-    RTCIceCandidate rtcIceCandidate = RTCIceCandidate(
-      candidate['candidate'],
-      candidate['sdpMid'],
-      candidate['sdpMLineIndex'],
+  Future<void> _onAnswer(String target, dynamic answer) async {
+    await _connection.setRemoteDescription(
+      RTCSessionDescription(answer["sdp"], answer["type"]),
     );
-    await _peerConnection!.addCandidate(rtcIceCandidate);
   }
 
-  Future<void> openUserMedia() async {
+  Future<void> _onICECandidate(String target, data) async {
+    final RTCIceCandidate candidate = RTCIceCandidate(
+      data["candidate"],
+      data["sdpMid"],
+      data["sdpMLineIndex"],
+    );
+    await _connection.addCandidate(candidate);
+  }
+
+  Future<void> _createOffer() async {
+    final offer = await _connection.createOffer();
+    await _connection.setLocalDescription(offer);
+    _signalingService.sendOffer(target, offer.toMap());
+  }
+
+  Future<void> getUserMedia() async {
     final Map<String, dynamic> mediaConstraints = {
       'audio': true,
       'video': {'facingMode': 'user'},
     };
+
     _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-    _localRenderer.srcObject = _localStream;
-    if (_localStream == null) return;
-    _localStream!.getTracks().forEach((track) {
-      _peerConnection?.addTrack(track, _localStream!);
-    });
+    localRenderer.srcObject = _localStream;
 
     notifyListeners();
   }
 
+  @override
   void dispose() {
-    _localStream?.getTracks().forEach((track) => track.stop());
-    _localRenderer.dispose();
-    _remoteRenderer.dispose();
-    _peerConnection?.close();
+    localRenderer.dispose();
+    remoteRenderer.dispose();
+    _connection.close();
+    _connection.dispose();
+
     super.dispose();
   }
 }

@@ -55,6 +55,7 @@ io.on('connection', (socket) => {
 
   socket.on('candidate', (data) => {
     const targetSocket = clients.find(client => client.id === data.target);
+    console.log("targetSocket: ${targetSocket}")
     if (targetSocket) {
       targetSocket.emit('candidate', { from: data.from || socket.id, candidate: data.candidate });
     }
