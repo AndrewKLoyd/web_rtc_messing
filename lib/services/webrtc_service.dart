@@ -43,9 +43,7 @@ class WebRTCService extends ChangeNotifier {
 
     _peerConnection!.onTrack = (RTCTrackEvent event) {
       if (event.streams.isNotEmpty) {
-        _remoteStream ??= event.streams[0];
-        _remoteStream?.addTrack(event.track);
-        _remoteRenderer.srcObject = _remoteStream;
+        _remoteRenderer.srcObject = event.streams[0];
         onAddStream(_remoteStream!);
         notifyListeners();
       }

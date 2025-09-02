@@ -29,6 +29,7 @@ class _CallScreenState extends State<CallScreen> {
           _signalingService.sendCandidate(from, candidate);
         },
         (stream) {
+          _webRTCService.openUserMedia();
           setState(() {});
         },
       );
