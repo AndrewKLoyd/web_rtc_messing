@@ -34,6 +34,13 @@ class WebRTCService extends ChangeNotifier {
       onIceCandidate(candidate.toMap());
     };
 
+    _peerConnection!.onConnectionState = (state) {
+      if (state != RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        return;
+      }
+      openUserMedia();
+    };
+
     _peerConnection!.onTrack = (RTCTrackEvent event) {
       if (event.streams.isNotEmpty) {
         _remoteStream ??= event.streams[0];
