@@ -63,7 +63,7 @@ class WebRTCService extends ChangeNotifier {
     };
     _connection.onTrack = (track) async {
       remoteRenderer.srcObject ??= track.streams.first;
-      remoteRenderer.srcObject?.addTrack(track.track);
+      await remoteRenderer.srcObject?.addTrack(track.track);
       notifyListeners();
     };
   }
