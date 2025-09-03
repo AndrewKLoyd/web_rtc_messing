@@ -17,11 +17,13 @@ void main() async {
     MaterialApp(
       home: Builder(
         builder: (context) => Scaffold(
-          body: ElevatedButton(
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (context) => MyApp())),
-            child: Text("Go to call"),
+          body: Center(
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (context) => MyApp())),
+              child: Text("Go to call"),
+            ),
           ),
         ),
       ),

@@ -13,7 +13,7 @@ class SignalingService extends ChangeNotifier {
   List<String> get clients => _clients;
 
   void connect() {
-    _socket = IO.io('http://192.168.1.142:3000', <String, dynamic>{
+    _socket = IO.io('http://tgn.medotrade.ru:23347', <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
     });
