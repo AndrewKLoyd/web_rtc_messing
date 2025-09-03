@@ -18,8 +18,8 @@ class _CallScreenState extends State<CallScreen> {
     super.initState();
     _signalingService = context.read<SignalingService>();
     _webRTCService = context.read<WebRTCService>();
-    _webRTCService.init();
     _signalingService.connect();
+    _webRTCService.init();
   }
 
   @override
@@ -35,13 +35,42 @@ class _CallScreenState extends State<CallScreen> {
       appBar: AppBar(title: Text('WebRTC Call')),
       body: Column(
         children: [
+          ElevatedButton(onPressed: () {}, child: Text("Reinit")),
           Expanded(
             child: ListenableBuilder(
               listenable: _webRTCService,
-              builder: (context, child) => Row(
+              builder: (context, child) => ListView(
+                shrinkWrap: true,
                 children: [
-                  Expanded(child: RTCVideoView(_webRTCService.localRenderer)),
-                  Expanded(child: RTCVideoView(_webRTCService.remoteRenderer)),
+                  SizedBox(
+                    width: 500,
+                    height: 500,
+                    child: RTCVideoView(_webRTCService.localRenderer),
+                  ),
+                  ..._webRTCService.remoteStreams.map(
+                    (e) => SizedBox(
+                      width: 500,
+                      height: 500,
+                      child: Builder(
+                        builder: (context) {
+                          final renderer = RTCVideoRenderer();
+                          return FutureBuilder(
+                            future: Future<bool>(() async {
+                              await renderer.initialize();
+                              return true;
+                            }),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) {
+                                return CircularProgressIndicator();
+                              }
+                              renderer.srcObject = e;
+                              return RTCVideoView(renderer);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

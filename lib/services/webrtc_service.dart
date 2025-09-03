@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:myapp/services/signaling_service.dart';
 
@@ -21,13 +22,19 @@ class WebRTCService extends ChangeNotifier {
     await _createOffer();
   }
 
+  final List<MediaStream> remoteStreams = [];
+
+  final constrains = {
+    'mandatory': {'OfferToReceiveAudio': true, 'OfferToReceiveVideo': true},
+  };
+
   Future<void> init() async {
     await localRenderer.initialize();
     await remoteRenderer.initialize();
     await getUserMedia();
     _connection = await createPeerConnection({
-      'urls': 'stun:stun.l.google.com:19302',
-    }, {});
+      'urls': 'stun.tagan.ru:3478',
+    }, constrains);
 
     for (MediaStreamTrack track in _localStream?.getTracks() ?? []) {
       _connection.addTrack(track, _localStream!);
@@ -37,33 +44,12 @@ class WebRTCService extends ChangeNotifier {
     _signalingService.onAnswer = _onAnswer;
     _signalingService.onCandidate = _onICECandidate;
 
-    _connection.onConnectionState = (state) async {
-      print(state.name);
-      if (state != RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
-        return;
-      }
-
-      notifyListeners();
-    };
     _connection.onIceCandidate = (candidate) {
       _signalingService.sendCandidate(target, candidate.toMap());
     };
-    _connection.onAddStream = (s) {
-      print(s);
-    };
-    _connection.onAddTrack = (s, t) {
-      print("s + t");
-    };
-    _connection.onAddTrack = (s, t) {
-      notifyListeners();
-    };
 
-    _connection.onAddStream = (stream) {
-      notifyListeners();
-    };
-    _connection.onTrack = (track) async {
-      remoteRenderer.srcObject ??= track.streams.first;
-      await remoteRenderer.srcObject?.addTrack(track.track);
+    _connection.onTrack = (event) async {
+      remoteStreams.addAll(event.streams);
       notifyListeners();
     };
   }
@@ -73,9 +59,8 @@ class WebRTCService extends ChangeNotifier {
     await _connection.setRemoteDescription(
       RTCSessionDescription(offer["sdp"], offer["type"]),
     );
-    final answer = await _connection.createAnswer();
+    final answer = await _connection.createAnswer(constrains);
     await _connection.setLocalDescription(answer);
-    // await _connection.setLocalDescription(answer);
     _signalingService.sendAnswer(target, answer.toMap());
   }
 
@@ -86,16 +71,13 @@ class WebRTCService extends ChangeNotifier {
   }
 
   Future<void> _onICECandidate(String target, data) async {
-    final RTCIceCandidate candidate = RTCIceCandidate(
-      data["candidate"],
-      data["sdpMid"],
-      data["sdpMLineIndex"],
+    await _connection.addCandidate(
+      RTCIceCandidate(data["candidate"], data["sdpMid"], data["sdpMLineIndex"]),
     );
-    await _connection.addCandidate(candidate);
   }
 
   Future<void> _createOffer() async {
-    final offer = await _connection.createOffer();
+    final offer = await _connection.createOffer(constrains);
     await _connection.setLocalDescription(offer);
     _signalingService.sendOffer(target, offer.toMap());
   }
@@ -103,7 +85,7 @@ class WebRTCService extends ChangeNotifier {
   Future<void> getUserMedia() async {
     final Map<String, dynamic> mediaConstraints = {
       'audio': true,
-      'video': {'facingMode': 'user'},
+      "video": {"width": 1280, "height": 720},
     };
 
     _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
